@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>圈叉遊戲 (Tic-Tac-Toe)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for animations and specific effects */
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .cell {
+            transition: all 0.3s ease;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.05);
+        }
+
+        .cell:hover:not(.occupied) {
+            background-color: rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+            transform: scale(0.98);
+        }
+
+        .cell.x {
+            color: #ef4444; /* Tailwind red-500 */
+            text-shadow: 0 4px 6px rgba(239, 68, 68, 0.3);
+        }
+
+        .cell.o {
+            color: #3b82f6; /* Tailwind blue-500 */
+            text-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);
+        }
+
+        /* Pop-in animation for marks */
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            80% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .mark-animate {
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        /* Winning line animation */
+        .win-cell {
+            background-color: rgba(167, 243, 208, 0.5); /* Tailwind emerald-200 with opacity */
+            transition: background-color 0.5s ease;
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full mx-4 relative overflow-hidden">
+        
+        <!-- Header -->
+        <div class="text-center mb-6">
+            <h1 class="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600 mb-2">圈叉遊戲</h1>
+            <p class="text-gray-500 font-medium">經典對戰，看誰連成一線！</p>
+        </div>
+
+        <!-- Score Board -->
+        <div class="flex justify-between items-center mb-6 bg-gray-100 p-4 rounded-xl shadow-inner">
+            <div class="text-center w-1/3">
+                <span class="block text-xl font-bold text-red-500">玩家 X</span>
+                <span id="score-x" class="text-2xl font-black text-gray-700">0</span>
+            </div>
+            <div class="text-center w-1/3">
+                <span class="block text-sm text-gray-400 font-semibold uppercase tracking-wider">平手</span>
+                <span id="score-tie" class="text-xl font-bold text-gray-600">0</span>
+            </div>
+            <div class="text-center w-1/3">
+                <span class="block text-xl font-bold text-blue-500">玩家 O</span>
+                <span id="score-o" class="text-2xl font-black text-gray-700">0</span>
+            </div>
+        </div>
+
+        <!-- Current Turn Indicator -->
+        <div id="status-display" class="text-center mb-4 text-lg font-semibold bg-gray-50 py-2 rounded-lg transition-colors duration-300">
+            輪到 <span id="current-player-display" class="text-red-500 font-bold text-xl">X</span> 下棋
+        </div>
+
+        <!-- Game Board Grid -->
+        <div id="board" class="grid grid-cols-3 gap-3 mb-6 bg-gray-200 p-3 rounded-xl shadow-inner">
+            <!-- Cells (Generated or hardcoded) -->
+            <div class="cell h-24 sm:h-28 bg-white rounded-lg flex items-center justify-center text-6xl font-bold cursor-pointer select-none" data-index="0"></div>
+            <div class="cell h-24 sm:h-28 bg-white rounded-lg flex items-center justify-center text-6xl font-bold cursor-pointer select-none" data-index="1"></div>
+            <div class="cell h-24 sm:h-28 bg-white rounded-lg flex items-center justify-center text-6xl font-bold cursor-pointer select-none" data-index="2"></div>
+            <div class="cell h-24 sm:h-28 bg-white rounded-lg flex items-center justify-center text-6xl font-bold cursor-pointer select-none" data-index="3"></div>
+            <div class="cell h-24 sm:h-28 bg-white rounded-lg flex items-center justify-center text-6xl font-bold cursor-pointer select-none" data-index="4"></div>
+            <div class="cell h-24 sm:h-28 bg-white rounded-lg flex items-center justify-center text-6xl font-bold cursor-pointer select-none" data-index="5"></div>
+            <div class="cell h-24 sm:h-28 bg-white rounded-lg flex items-center justify-center text-6xl font-bold cursor-pointer select-none" data-index="6"></div>
+            <div class="cell h-24 sm:h-28 bg-white rounded-lg flex items-center justify-center text-6xl font-bold cursor-pointer select-none" data-index="7"></div>
+            <div class="cell h-24 sm:h-28 bg-white rounded-lg flex items-center justify-center text-6xl font-bold cursor-pointer select-none" data-index="8"></div>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex gap-4">
+            <button id="reset-btn" class="flex-1 bg-gradient-to-r from-gray-200 to-gray-300 hover:from-gray-300 hover:to-gray-400 text-gray-800 font-bold py-3 px-6 rounded-xl shadow transition duration-300 transform hover:-translate-y-1">
+                重新開始一局
+            </button>
+            <button id="reset-score-btn" class="flex-1 bg-gradient-to-r from-red-100 to-red-200 hover:from-red-200 hover:to-red-300 text-red-800 font-bold py-3 px-6 rounded-xl shadow transition duration-300 transform hover:-translate-y-1">
+                重置分數
+            </button>
+        </div>
+
+        <!-- Game Over Overlay (Hidden by default) -->
+        <div id="game-over-overlay" class="absolute inset-0 bg-white/90 backdrop-blur-sm hidden flex-col items-center justify-center z-10 rounded-2xl">
+            <h2 id="winner-message" class="text-5xl font-extrabold mb-4 text-center text-gray-800 drop-shadow-md"></h2>
+            <button id="play-again-btn" class="mt-6 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-3 px-8 rounded-full shadow-lg transition duration-300 transform hover:scale-105">
+                再玩一次
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Game State Variables
+        let board = ['', '', '', '', '', '', '', '', ''];
+        let currentPlayer = 'X';
+        let gameActive = true;
+        
+        // Scores
+        let scoreX = 0;
+        let scoreO = 0;
+        let scoreTie = 0;
+
+        // Winning Combinations (Indices)
+        const winningConditions = [
+            [0, 1, 2], // Top row
+            [3, 4, 5], // Middle row
+            [6, 7, 8], // Bottom row
+            [0, 3, 6], // Left column
+            [1, 4, 7], // Middle column
+            [2, 5, 8], // Right column
+            [0, 4, 8], // Diagonal 1
+            [2, 4, 6]  // Diagonal 2
+        ];
+
+        // DOM Elements
+        const cells = document.querySelectorAll('.cell');
+        const statusDisplay = document.getElementById('status-display');
+        const currentPlayerDisplay = document.getElementById('current-player-display');
+        const resetBtn = document.getElementById('reset-btn');
+        const resetScoreBtn = document.getElementById('reset-score-btn');
+        const gameOverOverlay = document.getElementById('game-over-overlay');
+        const winnerMessage = document.getElementById('winner-message');
+        const playAgainBtn = document.getElementById('play-again-btn');
+        
+        const scoreXDisplay = document.getElementById('score-x');
+        const scoreODisplay = document.getElementById('score-o');
+        const scoreTieDisplay = document.getElementById('score-tie');
+
+        // Initialize Event Listeners
+        cells.forEach(cell => cell.addEventListener('click', handleCellClick));
+        resetBtn.addEventListener('click', restartGame);
+        resetScoreBtn.addEventListener('click', resetScores);
+        playAgainBtn.addEventListener('click', restartGame);
+
+        // Handle Cell Click
+        function handleCellClick(e) {
+            const clickedCell = e.target;
+            const cellIndex = parseInt(clickedCell.getAttribute('data-index'));
+
+            // Check if cell is already played or game is over
+            if (board[cellIndex] !== '' || !gameActive) {
+                return;
+            }
+
+            // Update internal state
+            board[cellIndex] = currentPlayer;
+            
+            // Update UI
+            updateCellUI(clickedCell, currentPlayer);
+            
+            // Check for Win or Draw
+            checkResult();
+        }
+
+        // Update the visual representation of a cell
+        function updateCellUI(cell, player) {
+            cell.innerText = player;
+            cell.classList.add('occupied', player.toLowerCase(), 'mark-animate');
+            // Remove animation class after it finishes so it can re-animate if needed (though not strictly necessary here)
+            setTimeout(() => {
+                cell.classList.remove('mark-animate');
+            }, 300);
+        }
+
+        // Check if the game has been won or is a draw
+        function checkResult() {
+            let roundWon = false;
+            let winningCells = [];
+
+            // Iterate through all possible winning combinations
+            for (let i = 0; i < winningConditions.length; i++) {
+                const winCondition = winningConditions[i];
+                let a = board[winCondition[0]];
+                let b = board[winCondition[1]];
+                let c = board[winCondition[2]];
+
+                // Skip if any cell in the combination is empty
+                if (a === '' || b === '' || c === '') {
+                    continue;
+                }
+
+                // If all three cells match, we have a winner
+                if (a === b && b === c) {
+                    roundWon = true;
+                    winningCells = winCondition;
+                    break;
+                }
+            }
+
+            // Handle Win
+            if (roundWon) {
+                gameActive = false;
+                highlightWinningCells(winningCells);
+                updateScore(currentPlayer);
+                showGameOver(`玩家 ${currentPlayer} 獲勝！ 🎉`);
+                return;
+            }
+
+            // Handle Draw (if no win and board is full)
+            let roundDraw = !board.includes('');
+            if (roundDraw) {
+                gameActive = false;
+                updateScore('TIE');
+                showGameOver('平手！ 🤝');
+                return;
+            }
+
+            // If game continues, switch player
+            currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+            updateStatusDisplay();
+        }
+
+        // Highlight the cells that form the winning line
+        function highlightWinningCells(indices) {
+            indices.forEach(index => {
+                cells[index].classList.add('win-cell');
+            });
+        }
+
+        // Update the status text indicating whose turn it is
+        function updateStatusDisplay() {
+            currentPlayerDisplay.innerText = currentPlayer;
+            
+            // Update color based on player
+            if (currentPlayer === 'X') {
+                currentPlayerDisplay.className = 'text-red-500 font-bold text-xl';
+                statusDisplay.className = 'text-center mb-4 text-lg font-semibold bg-red-50 py-2 rounded-lg transition-colors duration-300';
+            } else {
+                currentPlayerDisplay.className = 'text-blue-500 font-bold text-xl';
+                statusDisplay.className = 'text-center mb-4 text-lg font-semibold bg-blue-50 py-2 rounded-lg transition-colors duration-300';
+            }
+        }
+
+        // Update score variables and UI
+        function updateScore(result) {
+            if (result === 'X') {
+                scoreX++;
+                scoreXDisplay.innerText = scoreX;
+                scoreXDisplay.classList.add('scale-125', 'transition-transform');
+                setTimeout(() => scoreXDisplay.classList.remove('scale-125'), 300);
+            } else if (result === 'O') {
+                scoreO++;
+                scoreODisplay.innerText = scoreO;
+                scoreODisplay.classList.add('scale-125', 'transition-transform');
+                setTimeout(() => scoreODisplay.classList.remove('scale-125'), 300);
+            } else {
+                scoreTie++;
+                scoreTieDisplay.innerText = scoreTie;
+            }
+        }
+
+        // Show the game over overlay with a message
+        function showGameOver(message) {
+            winnerMessage.innerText = message;
+            
+            // Colorize winner message based on who won
+            if (message.includes('X')) {
+                winnerMessage.className = 'text-5xl font-extrabold mb-4 text-center text-red-500 drop-shadow-md';
+            } else if (message.includes('O')) {
+                winnerMessage.className = 'text-5xl font-extrabold mb-4 text-center text-blue-500 drop-shadow-md';
+            } else {
+                winnerMessage.className = 'text-5xl font-extrabold mb-4 text-center text-gray-700 drop-shadow-md';
+            }
+
+            // Slight delay before showing overlay for better UX
+            setTimeout(() => {
+                gameOverOverlay.classList.remove('hidden');
+                gameOverOverlay.classList.add('flex');
+            }, 500);
+        }
+
+        // Restart the game for a new round
+        function restartGame() {
+            gameActive = true;
+            currentPlayer = 'X';
+            board = ['', '', '', '', '', '', '', '', ''];
+            
+            updateStatusDisplay();
+            
+            // Hide overlay
+            gameOverOverlay.classList.add('hidden');
+            gameOverOverlay.classList.remove('flex');
+
+            // Reset board UI
+            cells.forEach(cell => {
+                cell.innerText = '';
+                cell.classList.remove('occupied', 'x', 'o', 'win-cell', 'mark-animate');
+            });
+        }
+
+        // Completely reset the game and scores
+        function resetScores() {
+            if(confirm('確定要重置所有分數嗎？')) {
+                scoreX = 0;
+                scoreO = 0;
+                scoreTie = 0;
+                scoreXDisplay.innerText = scoreX;
+                scoreODisplay.innerText = scoreO;
+                scoreTieDisplay.innerText = scoreTie;
+                restartGame();
+            }
+        }
+        
+        // Initial setup call
+        updateStatusDisplay();
+
+    </script>
+</body>
+</html>
