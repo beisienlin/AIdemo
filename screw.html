@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 螺絲規格辨識系統</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- SweetAlert2 for notifications -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <!-- PDF.js for rendering PDF to Image in browser -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    
+    <!-- SheetJS for Excel Export -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+        
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        .upload-zone {
+            border: 2px dashed #3b82f6;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-zone.dragover {
+            background-color: #eff6ff;
+            border-color: #2563eb;
+            transform: scale(1.02);
+        }
+
+        .step-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .step-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        /* Hide scrollbar for cleaner look */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8; 
+        }
+    </style>
+    
+    <script>
+        // Initialize PDF.js worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    </script>
+</head>
+<body class="text-slate-800 min-h-screen flex flex-col">
+
+    <nav class="bg-blue-900 text-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-screwdriver-wrench text-2xl text-blue-300"></i>
+                    <span class="font-bold text-xl tracking-wider">AI 螺絲規格辨識與圖面讀取系統</span>
+                </div>
+                <div class="hidden md:block">
+                    <span class="text-blue-200 text-sm">基於 Gemini API 視覺辨識</span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <!-- Left Column: Upload & Instructions -->
+            <div class="lg:col-span-5 flex flex-col gap-6">
+                
+                <!-- Upload Card -->
+                <div class="bg-white rounded-2xl shadow-sm p-6 border border-slate-200">
+                    <h2 class="text-lg font-bold mb-4 border-b pb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-cloud-arrow-up text-blue-600"></i> 上傳圖面 (PDF)
+                    </h2>
+                    
+                    <div id="dropZone" class="upload-zone rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer bg-slate-50 relative overflow-hidden">
+                        <input type="file" id="fileInput" accept="application/pdf" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+                        <i class="fa-regular fa-file-pdf text-5xl text-red-400 mb-3"></i>
+                        <p class="text-center font-medium text-slate-700">點擊或拖曳 PDF 檔案至此</p>
+                        <p class="text-center text-sm text-slate-400 mt-1">僅支援 .pdf 格式工程圖</p>
+                    </div>
+
+                    <div id="fileInfo" class="hidden mt-4 bg-blue-50 text-blue-800 p-3 rounded-lg flex items-center justify-between">
+                        <div class="flex items-center gap-2 truncate">
+                            <i class="fa-solid fa-file-check"></i>
+                            <span id="fileName" class="truncate font-medium text-sm">filename.pdf</span>
+                        </div>
+                        <button id="clearBtn" class="text-blue-400 hover:text-blue-700 transition z-20" onclick="resetApp()">
+                            <i class="fa-solid fa-times-circle text-lg"></i>
+                        </button>
+                    </div>
+
+                    <button id="analyzeBtn" disabled class="w-full mt-4 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-xl transition duration-200 shadow-md flex justify-center items-center gap-2">
+                        <i class="fa-solid fa-microchip"></i> 執行 AI 辨識
+                    </button>
+                </div>
+
+                <!-- 8 Steps Reference Card -->
+                <div class="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 flex-grow">
+                    <h2 class="text-lg font-bold mb-4 border-b pb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-list-ol text-blue-600"></i> 辨識 8 步驟基準
+                    </h2>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                        <div class="bg-slate-50 p-2 rounded border border-slate-100 flex items-center gap-2"><span class="bg-orange-500 text-white w-6 h-6 rounded flex justify-center items-center font-bold">1</span> 螺絲類型</div>
+                        <div class="bg-slate-50 p-2 rounded border border-slate-100 flex items-center gap-2"><span class="bg-orange-500 text-white w-6 h-6 rounded flex justify-center items-center font-bold">2</span> 辨識頭型</div>
+                        <div class="bg-slate-50 p-2 rounded border border-slate-100 flex items-center gap-2"><span class="bg-orange-500 text-white w-6 h-6 rounded flex justify-center items-center font-bold">3</span> 驅動槽型</div>
+                        <div class="bg-slate-50 p-2 rounded border border-slate-100 flex items-center gap-2"><span class="bg-orange-500 text-white w-6 h-6 rounded flex justify-center items-center font-bold">4</span> 公稱直徑</div>
+                        <div class="bg-slate-50 p-2 rounded border border-slate-100 flex items-center gap-2"><span class="bg-orange-500 text-white w-6 h-6 rounded flex justify-center items-center font-bold">5</span> 螺絲長度</div>
+                        <div class="bg-slate-50 p-2 rounded border border-slate-100 flex items-center gap-2"><span class="bg-orange-500 text-white w-6 h-6 rounded flex justify-center items-center font-bold">6</span> 牙距與牙型</div>
+                        <div class="bg-slate-50 p-2 rounded border border-slate-100 flex items-center gap-2"><span class="bg-orange-500 text-white w-6 h-6 rounded flex justify-center items-center font-bold">7</span> 材質與表面</div>
+                        <div class="bg-slate-50 p-2 rounded border border-slate-100 flex items-center gap-2"><span class="bg-orange-500 text-white w-6 h-6 rounded flex justify-center items-center font-bold">8</span> 標準與規格</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Results & Export -->
+            <div class="lg:col-span-7 flex flex-col gap-6">
+                
+                <div class="bg-white rounded-2xl shadow-sm p-6 border border-slate-200 h-full flex flex-col">
+                    <div class="flex justify-between items-center mb-4 border-b pb-2">
+                        <h2 class="text-lg font-bold flex items-center gap-2">
+                            <i class="fa-solid fa-table-list text-green-600"></i> 解析結果
+                        </h2>
+                        <button id="exportBtn" disabled class="bg-green-600 hover:bg-green-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-sm font-bold py-2 px-4 rounded transition flex items-center gap-2 shadow">
+                            <i class="fa-solid fa-file-excel"></i> 輸出 Excel
+                        </button>
+                    </div>
+
+                    <!-- Hidden Canvas for PDF rendering -->
+                    <canvas id="pdfCanvas" class="hidden"></canvas>
+
+                    <!-- Empty State / Loading State -->
+                    <div id="resultState" class="flex-grow flex flex-col items-center justify-center text-slate-400 py-12">
+                        <i class="fa-solid fa-robot text-6xl mb-4 text-slate-200"></i>
+                        <p>等待上傳圖面並執行分析...</p>
+                    </div>
+
+                    <!-- Results Table (Hidden initially) -->
+                    <div id="resultsContainer" class="hidden flex-grow overflow-auto">
+                        <table class="w-full text-left border-collapse" id="dataTable">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-600 text-sm uppercase tracking-wider">
+                                    <th class="p-3 border-b-2 border-slate-200 font-bold w-16">步驟</th>
+                                    <th class="p-3 border-b-2 border-slate-200 font-bold w-32">屬性</th>
+                                    <th class="p-3 border-b-2 border-slate-200 font-bold">解析內容</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-slate-700" id="resultsBody">
+                                <!-- Data will be injected here -->
+                            </tbody>
+                        </table>
+                        
+                        <div class="mt-6 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded text-sm text-yellow-800">
+                            <p class="font-bold mb-1"><i class="fa-solid fa-triangle-exclamation"></i> AI 解析備註：</p>
+                            <p id="aiRemarks">無</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Elements
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const exportBtn = document.getElementById('exportBtn');
+        const resultState = document.getElementById('resultState');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const resultsBody = document.getElementById('resultsBody');
+        const pdfCanvas = document.getElementById('pdfCanvas');
+        const aiRemarks = document.getElementById('aiRemarks');
+
+        // State variables
+        let currentFile = null;
+        let base64Image = null;
+        let parsedData = null; // Store JSON for Excel export
+
+        // Drag and drop event listeners
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'), false);
+        });
+
+        dropZone.addEventListener('drop', handleDrop, false);
+        fileInput.addEventListener('change', handleFileSelect, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        }
+
+        function handleFileSelect(e) {
+            const files = e.target.files;
+            handleFiles(files);
+        }
+
+        function handleFiles(files) {
+            if (files.length === 0) return;
+            const file = files[0];
+            
+            if (file.type !== 'application/pdf') {
+                Swal.fire({
+                    icon: 'error',
+                    title: '格式錯誤',
+                    text: '請上傳 PDF 檔案。',
+                    confirmButtonColor: '#3b82f6'
+                });
+                return;
+            }
+
+            currentFile = file;
+            fileName.textContent = file.name;
+            fileInfo.classList.remove('hidden');
+            analyzeBtn.disabled = false;
+            
+            // Read PDF and convert first page to image
+            convertPdfToImage(file);
+        }
+
+        async function convertPdfToImage(file) {
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const loadingTask = pdfjsLib.getDocument({data: arrayBuffer});
+                const pdf = await loadingTask.promise;
+                
+                // Get the first page
+                const page = await pdf.getPage(1);
+                
+                // Set scale for high quality image (2.0 or 3.0)
+                const scale = 2.5; 
+                const viewport = page.getViewport({scale: scale});
+                
+                // Prepare canvas
+                const context = pdfCanvas.getContext('2d');
+                pdfCanvas.width = viewport.width;
+                pdfCanvas.height = viewport.height;
+                
+                // Render PDF page into canvas context
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: viewport
+                };
+                await page.render(renderContext).promise;
+                
+                // Convert canvas to base64 JPEG
+                // Use jpeg to save size, 0.8 quality
+                const dataUrl = pdfCanvas.toDataURL('image/jpeg', 0.8);
+                // Remove the "data:image/jpeg;base64," part for the API
+                base64Image = dataUrl.split(',')[1];
+                
+                console.log("PDF rendered to image successfully.");
+
+            } catch (error) {
+                console.error("Error rendering PDF:", error);
+                Swal.fire({
+                    icon: 'error',
+                    title: '讀取失敗',
+                    text: '無法解析此 PDF 檔案，請確認檔案是否損毀。',
+                    confirmButtonColor: '#3b82f6'
+                });
+                resetApp();
+            }
+        }
+
+        function resetApp() {
+            fileInput.value = '';
+            currentFile = null;
+            base64Image = null;
+            parsedData = null;
+            fileInfo.classList.add('hidden');
+            analyzeBtn.disabled = true;
+            exportBtn.disabled = true;
+            
+            resultsContainer.classList.add('hidden');
+            resultState.classList.remove('hidden');
+            resultState.innerHTML = `
+                <i class="fa-solid fa-robot text-6xl mb-4 text-slate-200"></i>
+                <p>等待上傳圖面並執行分析...</p>
+            `;
+        }
+
+        analyzeBtn.addEventListener('click', async () => {
+            if (!base64Image) {
+                Swal.fire('錯誤', '影像尚未準備好，請稍後再試或重新上傳。', 'error');
+                return;
+            }
+
+            // UI Loading state
+            analyzeBtn.disabled = true;
+            analyzeBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> 正在分析中...';
+            resultState.classList.remove('hidden');
+            resultsContainer.classList.add('hidden');
+            resultState.innerHTML = `
+                <div class="flex flex-col items-center">
+                    <i class="fa-solid fa-microchip fa-fade text-5xl text-blue-500 mb-4"></i>
+                    <p class="text-blue-600 font-bold">AI 視覺模型正在讀取圖面與規格表中...</p>
+                    <p class="text-sm text-slate-400 mt-2">這可能需要幾秒鐘的時間</p>
+                </div>
+            `;
+
+            try {
+                await callGeminiAPI(base64Image);
+            } catch (error) {
+                console.error("API Error:", error);
+                Swal.fire({
+                    icon: 'error',
+                    title: '分析失敗',
+                    text: '呼叫 AI 服務時發生錯誤，請稍後再試。',
+                    confirmButtonColor: '#3b82f6'
+                });
+                resetApp();
+            } finally {
+                analyzeBtn.disabled = false;
+                analyzeBtn.innerHTML = '<i class="fa-solid fa-microchip"></i> 執行 AI 辨識';
+            }
+        });
+
+        async function callGeminiAPI(base64Data) {
+            const apiKey = ""; // API key populated by environment
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+            const systemPrompt = `
+你是一位頂尖的緊固件/螺絲工程師。
+我將提供一張螺絲工程圖或包裝標籤的圖片。請根據「螺絲辨識8步驟」嚴格提取資訊。
+
+請將提取結果轉換為以下 JSON 格式回傳 (必須是合法的 JSON，不要加上 markdown code block，直接輸出 JSON)：
+{
+  "step1_type": "步驟1: 螺絲類型 (例如: 機械、自攻、木螺絲、鑽尾等)",
+  "step2_head": "步驟2: 頭型 (例如: 圓頭、皿頭、六角頭、平頭等)",
+  "step3_drive": "步驟3: 驅動槽型 (例如: 十字、梅花/星型(Star)、內六角等)",
+  "step4_diameter": "步驟4: 公稱直徑/尺寸 (例如: #8, M6, 1/4\" 等)",
+  "step5_length": "步驟5: 螺絲長度 (包含公制或英制，例如: 3\", 25mm)",
+  "step6_thread": "步驟6: 牙距與牙型 (例如: 粗牙(Coarse), 細牙, T-17等特徵)",
+  "step7_material": "步驟7: 材質與表面處理 (例如: 碳鋼 C1018-C1022, 鍍鋅, Paint coating 等)",
+  "step8_standard": "步驟8: 規格/標準 (例如: 公司圖面, ISO, 或包裝特定品名/料號)",
+  "remarks": "針對此圖面的其他重要工程備註(例如硬度、扭力等，若無則填寫'無')"
+}
+
+請盡可能從圖片中的文字、表格與繪圖中尋找線索。如果某項資訊在圖片中完全找不到，請填寫 "未標示(N/A)"。
+注意: 請特別注意英文標籤的翻譯，例如 "Flat Head" -> 皿頭/平頭, "Star Drive" -> 梅花/星型槽, "Wood Construction Screw" -> 木結構螺絲。
+`;
+
+            const payload = {
+                contents: [
+                    {
+                        role: "user",
+                        parts: [
+                            { text: systemPrompt },
+                            {
+                                inlineData: {
+                                    mimeType: "image/jpeg",
+                                    data: base64Data
+                                }
+                            }
+                        ]
+                    }
+                ],
+                generationConfig: {
+                    temperature: 0.2, // Low temp for extraction tasks
+                    responseMimeType: "application/json"
+                }
+            };
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            
+            if (result.candidates && result.candidates.length > 0) {
+                const jsonText = result.candidates[0].content.parts[0].text;
+                parsedData = JSON.parse(jsonText);
+                renderResults(parsedData);
+            } else {
+                throw new Error("No candidates in response");
+            }
+        }
+
+        function renderResults(data) {
+            resultState.classList.add('hidden');
+            resultsContainer.classList.remove('hidden');
+            exportBtn.disabled = false;
+
+            const mapping = [
+                { step: '1', attr: '螺絲類型', key: 'step1_type', icon: 'fa-screw' },
+                { step: '2', attr: '頭型', key: 'step2_head', icon: 'fa-circle' },
+                { step: '3', attr: '驅動槽型', key: 'step3_drive', icon: 'fa-asterisk' },
+                { step: '4', attr: '公稱直徑', key: 'step4_diameter', icon: 'fa-ruler-horizontal' },
+                { step: '5', attr: '螺絲長度', key: 'step5_length', icon: 'fa-ruler-vertical' },
+                { step: '6', attr: '牙距與牙型', key: 'step6_thread', icon: 'fa-wave-square' },
+                { step: '7', attr: '材質與表面', key: 'step7_material', icon: 'fa-shield-halved' },
+                { step: '8', attr: '標準與規格', key: 'step8_standard', icon: 'fa-file-signature' }
+            ];
+
+            resultsBody.innerHTML = '';
+
+            mapping.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-slate-100 hover:bg-slate-50 transition';
+                
+                tr.innerHTML = `
+                    <td class="p-3 text-center">
+                        <span class="bg-blue-100 text-blue-800 font-bold w-6 h-6 rounded-full flex items-center justify-center text-sm mx-auto">
+                            ${item.step}
+                        </span>
+                    </td>
+                    <td class="p-3 font-medium text-slate-800">
+                        ${item.attr}
+                    </td>
+                    <td class="p-3 text-slate-600 font-medium whitespace-pre-wrap">${data[item.key] || '解析失敗'}</td>
+                `;
+                resultsBody.appendChild(tr);
+            });
+
+            aiRemarks.textContent = data.remarks || '無';
+        }
+
+        // Export to Excel functionality
+        exportBtn.addEventListener('click', () => {
+            if (!parsedData) return;
+
+            // Prepare data array for SheetJS
+            const wsData = [
+                ["步驟", "辨識屬性", "解析內容"] // Header
+            ];
+
+            const mapping = [
+                { step: '1', attr: '螺絲類型', val: parsedData.step1_type },
+                { step: '2', attr: '頭型', val: parsedData.step2_head },
+                { step: '3', attr: '驅動槽型', val: parsedData.step3_drive },
+                { step: '4', attr: '公稱直徑', val: parsedData.step4_diameter },
+                { step: '5', attr: '螺絲長度', val: parsedData.step5_length },
+                { step: '6', attr: '牙距與牙型', val: parsedData.step6_thread },
+                { step: '7', attr: '材質與表面', val: parsedData.step7_material },
+                { step: '8', attr: '標準與規格', val: parsedData.step8_standard },
+                { step: '-', attr: '備註', val: parsedData.remarks }
+            ];
+
+            mapping.forEach(row => {
+                wsData.push([row.step, row.attr, row.val]);
+            });
+
+            // Create workbook and worksheet
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+            // Set column widths
+            ws['!cols'] = [
+                { wch: 10 }, // 步驟
+                { wch: 20 }, // 屬性
+                { wch: 50 }  // 內容
+            ];
+
+            XLSX.utils.book_append_sheet(wb, ws, "螺絲規格解析結果");
+
+            // Generate filename based on original file
+            const originalName = currentFile.name.replace('.pdf', '');
+            const exportFileName = `${originalName}_解析結果.xlsx`;
+
+            // Download
+            XLSX.writeFile(wb, exportFileName);
+            
+            Swal.fire({
+                icon: 'success',
+                title: '匯出成功',
+                text: `已成功匯出 ${exportFileName}`,
+                timer: 2000,
+                showConfirmButton: false
+            });
+        });
+
+    </script>
+</body>
+</html>
