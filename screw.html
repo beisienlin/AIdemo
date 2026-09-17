@@ -76,10 +76,12 @@
             <div class="flex items-center justify-between h-16">
                 <div class="flex items-center gap-3">
                     <i class="fa-solid fa-screwdriver-wrench text-2xl text-blue-300"></i>
-                    <span class="font-bold text-xl tracking-wider">AI 螺絲規格辨識與圖面讀取系統</span>
+                    <span class="font-bold text-xl tracking-wider">AI 螺絲規格辨識系統</span>
                 </div>
-                <div class="hidden md:block">
-                    <span class="text-blue-200 text-sm">基於 Gemini API 視覺辨識</span>
+                <div class="flex items-center gap-4">
+                    <button id="apiKeyBtn" class="bg-blue-800 hover:bg-blue-700 text-blue-100 px-3 py-1.5 rounded-lg border border-blue-700 transition flex items-center gap-2 text-sm">
+                        <i class="fa-solid fa-key"></i> <span class="hidden sm:inline">設定 API Key</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -87,6 +89,20 @@
 
     <main class="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8">
         
+        <!-- API Key Reminder Alert -->
+        <div id="apiKeyReminder" class="hidden mb-6 bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-lg shadow-sm flex items-start justify-between">
+            <div class="flex gap-3">
+                <i class="fa-solid fa-triangle-exclamation text-amber-500 text-xl mt-0.5"></i>
+                <div>
+                    <h3 class="text-amber-800 font-bold">尚未設定 Gemini API Key</h3>
+                    <p class="text-amber-700 text-sm mt-1">請點擊右上角設定您的 API Key 以啟用 AI 辨識功能。金鑰僅會儲存於您的瀏覽器本地端，不會回傳至任何第三方伺服器。</p>
+                </div>
+            </div>
+            <button onclick="promptApiKey()" class="bg-amber-100 hover:bg-amber-200 text-amber-800 px-4 py-2 rounded font-medium text-sm transition">
+                立即設定
+            </button>
+        </div>
+
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
             
             <!-- Left Column: Upload & Instructions -->
@@ -198,11 +214,66 @@
         const resultsBody = document.getElementById('resultsBody');
         const pdfCanvas = document.getElementById('pdfCanvas');
         const aiRemarks = document.getElementById('aiRemarks');
+        const apiKeyBtn = document.getElementById('apiKeyBtn');
+        const apiKeyReminder = document.getElementById('apiKeyReminder');
 
         // State variables
         let currentFile = null;
         let base64Image = null;
         let parsedData = null; // Store JSON for Excel export
+
+        // ===== API Key Management =====
+        function checkApiKeyStatus() {
+            const savedKey = localStorage.getItem('gemini_api_key');
+            if (!savedKey) {
+                apiKeyReminder.classList.remove('hidden');
+                apiKeyBtn.classList.add('bg-amber-500', 'hover:bg-amber-600', 'border-amber-600');
+                apiKeyBtn.classList.remove('bg-blue-800', 'hover:bg-blue-700', 'border-blue-700');
+            } else {
+                apiKeyReminder.classList.add('hidden');
+                apiKeyBtn.classList.remove('bg-amber-500', 'hover:bg-amber-600', 'border-amber-600');
+                apiKeyBtn.classList.add('bg-blue-800', 'hover:bg-blue-700', 'border-blue-700');
+            }
+        }
+
+        function promptApiKey() {
+            Swal.fire({
+                title: '設定 Gemini API Key',
+                html: `
+                    <p class="text-sm text-gray-500 mb-4 text-left">請輸入您的 Google Gemini API 金鑰。此金鑰僅會儲存在您的瀏覽器中，完全安全。</p>
+                `,
+                input: 'password',
+                inputPlaceholder: '輸入 API Key (例如: AIzaSy...)',
+                inputValue: localStorage.getItem('gemini_api_key') || '',
+                showCancelButton: true,
+                confirmButtonText: '儲存',
+                cancelButtonText: '取消',
+                confirmButtonColor: '#3b82f6',
+                inputValidator: (value) => {
+                    if (!value) {
+                        return 'API Key 不能為空！'
+                    }
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    localStorage.setItem('gemini_api_key', result.value);
+                    Swal.fire({
+                        icon: 'success',
+                        title: '已儲存',
+                        text: 'API Key 已成功儲存於瀏覽器',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                    checkApiKeyStatus();
+                }
+            });
+        }
+
+        apiKeyBtn.addEventListener('click', promptApiKey);
+        
+        // Initial check on load
+        checkApiKeyStatus();
+        // ===============================
 
         // Drag and drop event listeners
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -322,6 +393,21 @@
         }
 
         analyzeBtn.addEventListener('click', async () => {
+            const userApiKey = localStorage.getItem('gemini_api_key');
+            
+            if (!userApiKey) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: '缺少 API Key',
+                    text: '請先設定您的 Gemini API Key 才能執行辨識。',
+                    confirmButtonColor: '#3b82f6',
+                    confirmButtonText: '前往設定'
+                }).then((result) => {
+                    if (result.isConfirmed) promptApiKey();
+                });
+                return;
+            }
+
             if (!base64Image) {
                 Swal.fire('錯誤', '影像尚未準備好，請稍後再試或重新上傳。', 'error');
                 return;
@@ -341,13 +427,18 @@
             `;
 
             try {
-                await callGeminiAPI(base64Image);
+                await callGeminiAPI(base64Image, userApiKey);
             } catch (error) {
                 console.error("API Error:", error);
+                
+                let errorMsg = '呼叫 AI 服務時發生錯誤，請稍後再試。';
+                if (error.message.includes('400')) errorMsg = 'API Key 格式錯誤或無效，請重新檢查。';
+                if (error.message.includes('403')) errorMsg = 'API Key 權限不足或已被停用。';
+
                 Swal.fire({
                     icon: 'error',
                     title: '分析失敗',
-                    text: '呼叫 AI 服務時發生錯誤，請稍後再試。',
+                    text: errorMsg,
                     confirmButtonColor: '#3b82f6'
                 });
                 resetApp();
@@ -357,8 +448,8 @@
             }
         });
 
-        async function callGeminiAPI(base64Data) {
-            const apiKey = ""; // API key populated by environment
+        async function callGeminiAPI(base64Data, apiKey) {
+            // 使用傳入的 apiKey 變數
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
 
             const systemPrompt = `
