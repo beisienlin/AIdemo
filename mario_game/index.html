@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>復古超級瑪莉 - Retro Super Mario 8-Bit</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="arcade-container">
+    <!-- Arcade Header -->
+    <header class="arcade-header">
+      <div class="arcade-title">
+        <span>🍄</span> SUPER MARIO <span>★</span>
+      </div>
+      <div class="arcade-controls-hint">
+        <div>操作：<span>方向鍵 / WASD</span> 移動</div>
+        <div>跳躍：<span>空白鍵 / Z</span> ｜ 加速：<span>Shift / X</span></div>
+      </div>
+    </header>
+
+    <!-- Retro CRT Screen Frame -->
+    <div class="screen-frame">
+      <canvas id="gameCanvas" width="256" height="224"></canvas>
+      <div class="crt-overlay"></div>
+    </div>
+
+    <!-- Retro Toolbar Buttons -->
+    <div class="toolbar">
+      <button id="btnStart" class="btn-retro btn-primary">🎮 開始遊戲</button>
+      <button id="btnPause" class="btn-retro">⏸ 暫停 (P)</button>
+      <button id="btnMute" class="btn-retro">🔊 音效 (M)</button>
+      <button id="btnCrt" class="btn-retro">📺 CRT濾鏡 (C)</button>
+    </div>
+
+    <!-- Virtual Gamepad for Touch/Mobile -->
+    <div class="virtual-gamepad">
+      <div class="v-dpad">
+        <div></div>
+        <div></div>
+        <div></div>
+        <div class="v-btn" id="v-left">◀</div>
+        <div class="v-btn" id="v-down">▼</div>
+        <div class="v-btn" id="v-right">▶</div>
+        <div></div>
+        <div></div>
+        <div></div>
+      </div>
+      <div class="v-actions">
+        <div class="v-action-btn b-btn" id="v-run">B</div>
+        <div class="v-action-btn" id="v-jump">A</div>
+      </div>
+    </div>
+
+    <!-- Game Guide & Features Panel -->
+    <section class="instructions-panel">
+      <h4>🕹️ 遊戲玩法與特色秘技</h4>
+      <div>• <strong>基本移動</strong>：<kbd>⬅</kbd> <kbd>➡</kbd> 或 <kbd>A</kbd> <kbd>D</kbd> 左右走動，奔跑時反向會有復古滑步剎車！</div>
+      <div>• <strong>跳躍技巧</strong>：<kbd>空白鍵</kbd>、<kbd>⬆</kbd> 或 <kbd>Z</kbd> 跳躍。<strong>按住不放跳得更高</strong>，輕點則是小跳。</div>
+      <div>• <strong>加速奔跑</strong>：按住 <kbd>Shift</kbd> 或 <kbd>X</kbd> 可以全速衝刺，能跳過更寬的懸崖深淵！</div>
+      <div>• <strong>撞擊問號磚塊</strong>：用頭部頂撞 <kbd>?</kbd> 磚塊可獲取金幣，第 21 號磚塊藏有<strong>超級蘑菇</strong>，吃下變身大瑪莉！</div>
+      <div>• <strong>破壞磚塊</strong>：變身大瑪莉後，用頭部猛撞普通磚塊可以<strong>徹底粉碎磚塊</strong>並賺取積分！</div>
+      <div>• <strong>踩怪與踢龜殼</strong>：踩扁栗子怪；踩擊綠色烏龜會縮進龜殼，再次走過去會<strong>踢飛龜殼</strong>，滑動的龜殼會撞倒沿途所有怪物！</div>
+      <div>• <strong>關底旗桿</strong>：跳上旗桿抓得越高分數越高，滑下旗桿進入城堡即可過關慶祝！</div>
+    </section>
+  </div>
+
+  <!-- Game Scripts (Pure Vanilla JS, 100% Offline & Standalone) -->
+  <script src="audio.js"></script>
+  <script src="sprites.js"></script>
+  <script src="entities.js"></script>
+  <script src="level.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
