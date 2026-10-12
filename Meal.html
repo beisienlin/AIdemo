@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>四口之家 每週專屬菜單產生器</title>
+  <style>
+    :root {
+      --primary: #ea580c;
+      --primary-hover: #c2410c;
+      --bg-page: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --badge-weekday: #0284c7;
+      --badge-weekend: #e11d48;
+      --gold: #f59e0b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang TC", "Microsoft JhengHei", sans-serif; }
+    body { background-color: var(--bg-page); color: var(--text-main); line-height: 1.6; padding: 24px 16px; }
+    .container { max-width: 1100px; margin: 0 auto; }
+
+    header {
+      background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+      border: 1px solid #fed7aa;
+      border-radius: 18px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+    }
+    h1 { font-size: 26px; color: #9a3412; display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .family-meta { display: flex; flex-wrap: wrap; gap: 10px; }
+    .meta-tag {
+      background: white;
+      padding: 7px 14px;
+      border-radius: 20px;
+      font-size: 13.5px;
+      font-weight: 500;
+      color: #7c2d12;
+      border: 1px solid #fed7aa;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 24px;
+      align-items: center;
+      justify-content: space-between;
+      background: white;
+      padding: 16px 20px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+    }
+    .btn-group { display: flex; gap: 10px; flex-wrap: wrap; }
+    button {
+      cursor: pointer;
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 14px;
+      border: none;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-primary { background-color: var(--primary); color: white; }
+    .btn-primary:hover { background-color: var(--primary-hover); transform: translateY(-1px); }
+    .btn-secondary { background-color: #f1f5f9; color: #334155; border: 1px solid var(--border); }
+    .btn-secondary:hover { background-color: #e2e8f0; }
+    .btn-save { background-color: #059669; color: white; }
+    .btn-save:hover { background-color: #047857; }
+
+    .grid-meals {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+      gap: 20px;
+    }
+
+    .meal-card {
+      background: var(--card-bg);
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      padding: 18px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    .meal-card.weekend { border-top: 4px solid var(--badge-weekend); }
+    .meal-card.weekday { border-top: 4px solid var(--badge-weekday); }
+
+    .meal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .meal-title { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .badge {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      color: white;
+    }
+    .badge-weekday { background-color: var(--badge-weekday); }
+    .badge-weekend { background-color: var(--badge-weekend); }
+    .budget-tag { font-size: 13px; color: var(--text-muted); font-weight: 500; }
+
+    .option-list { display: flex; flex-direction: column; gap: 12px; flex-grow: 1; }
+    .option-item {
+      background: #fafaf9;
+      border: 1px solid #f0f0ee;
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .option-item.highlight {
+      background: #fffbeb;
+      border-color: #fde68a;
+    }
+    .option-badge {
+      font-size: 11px;
+      font-weight: 700;
+      color: #92400e;
+      background: #fde68a;
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: inline-block;
+      margin-bottom: 6px;
+    }
+    .option-name { font-weight: 600; font-size: 14px; margin-bottom: 6px; color: #1e293b; }
+    .option-details { font-size: 12px; color: #64748b; margin-bottom: 4px; display: flex; gap: 8px; }
+    .option-tip { font-size: 12px; color: #475569; background: white; padding: 6px 8px; border-radius: 6px; border: 1px dashed #e2e8f0; margin-top: 6px; }
+
+    .card-footer {
+      margin-top: 14px;
+      padding-top: 10px;
+      border-top: 1px solid #f1f5f9;
+      display: flex;
+      justify-content: flex-end;
+    }
+    .btn-reroll {
+      font-size: 12px;
+      padding: 5px 12px;
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      color: #475569;
+    }
+    .btn-reroll:hover { background: #e2e8f0; }
+
+    .tips-section {
+      background: white;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      padding: 24px;
+      margin-top: 30px;
+    }
+    .tips-section h3 { font-size: 18px; margin-bottom: 12px; color: #1e293b; }
+    .tips-list { padding-left: 20px; font-size: 14px; color: #475569; }
+    .tips-list li { margin-bottom: 8px; }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #1e293b;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 10px;
+      box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+      display: none;
+      font-size: 14px;
+      z-index: 1000;
+    }
+
+    @media print {
+      body { background: white; padding: 0; }
+      .toolbar, .btn-reroll { display: none; }
+      .meal-card { page-break-inside: avoid; border: 1px solid #ccc; box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>🍲 四口之家 每週專屬菜單小工具</h1>
+    <div class="family-meta">
+      <div class="meta-tag">👨‍👩‍👧‍👦 <b>成員</b>：大人 2位 (42歲、41歲) ＋ 小孩 2位 (10歲、9歲)</div>
+      <div class="meta-tag">💼 <b>平日晚餐</b>：$150/人（4人總預算約 $600）</div>
+      <div class="meta-tag">🎉 <b>假日午晚餐</b>：$500/人（4人總預算約 $2,000）</div>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <div class="btn-group">
+      <button class="btn-primary" onclick="generateAllMenu()">🎲 重新抽整週菜單</button>
+      <button class="btn-save" onclick="saveDirectly()">💾 儲存菜單 (存入晚餐資料夾)</button>
+      <button class="btn-secondary" onclick="copyToClipboard()">📋 一鍵複製整週文字</button>
+      <button class="btn-secondary" onclick="window.print()">🖨️ 列印/轉PDF</button>
+    </div>
+    <span style="font-size: 13px; color: #64748b;" id="generateTime"></span>
+  </div>
+
+  <div class="grid-meals" id="mealsContainer"></div>
+
+  <div class="tips-section">
+    <h3>🥦 家庭專屬營養與採買指南</h3>
+    <ul class="tips-list">
+      <li><b>10歲與9歲孩子成長發育期</b>：骨骼發育與專注力需充足鈣質與DHA，建議多選鮭魚、豆腐味噌湯、起司、鮮奶及雞蛋。</li>
+      <li><b>42歲與41歲爸媽維持新陳代謝</b>：平日晚餐白飯可減半或換成十穀米，每餐搭配至少一大盤深綠色燙青菜。</li>
+      <li><b>儲存到「晚餐資料夾」方式</b>：點擊上方的「💾 儲存菜單」，選擇儲存在您桌面的 <code>晚餐建議\晚餐資料夾</code> 即可！</li>
+    </ul>
+  </div>
+</div>
+
+<div class="toast" id="toastBox"></div>
+
+<script>
+const MEAL_DATABASE = {
+  weekday_dinner: [
+    { name: "香煎鮭魚排＋玉米洋蔥炒蛋＋蒜炒高麗菜＋十穀飯＋豆腐味噌湯", type: "自煮快炒", cost: 520, tip: "鮭魚Omega-3護眼護腦，玉米洋蔥蛋香甜小孩超愛，十穀飯高纖低GI。" },
+    { name: "日式甘口咖哩燉雞肉＋花椰菜小番茄＋水煮蛋＋紫米飯", type: "自煮一鍋到底", cost: 460, tip: "一鍋到底省時省力，甘口咖哩小孩最愛，雞肉低脂好吸收。" },
+    { name: "手工鮮肉玉米水餃 & 高麗菜水餃40顆 ＋ 黑白切滷味大拼盤 ＋ 青菜豆腐湯", type: "傳統水餃館", cost: 550, tip: "玉米水餃小孩最愛，搭配豐富豆干海帶牛腱切盤與大碗青菜湯。" },
+    { name: "舒肥雞胸肉/烤鯖魚低GI健康餐盒4份 ＋ 溫熱無糖豆漿", type: "外送/健康便當", cost: 580, tip: "紫米低升糖少油少鹽，三種綠色蔬菜，兼顧爸媽身材與孩子成長。" },
+    { name: "平價鐵板燒（香蒜雞腿排＋黑胡椒牛肉片＋蔥爆豬肉＋荷包蛋＋炒高麗菜豆芽吃到飽）", type: "平價外食", cost: 590, tip: "蔬菜份量極大，熱騰騰香氣逼人，小孩配飯吃得快，大人多菜少澱粉。" },
+    { name: "日式照燒雞腿丼飯 ＆ 牛肉壽喜燒丼飯 ＋ 燙時蔬 ＋ 柴魚茶碗蒸2入", type: "日式平價丼飯", cost: 560, tip: "甜鹹照燒醬汁下飯，茶碗蒸補鈣高蛋白好吸收，適度補充溫熱湯品。" },
+    { name: "百元風味小火鍋 3-4鍋（起司牛奶鍋＋番茄蔬菜鍋＋大骨肉片鍋）", type: "平價小火鍋", cost: 600, tip: "起司牛奶鍋小孩愛不釋手，番茄蔬菜湯清爽少負擔，原型蔬菜充足。" },
+    { name: "義大利番茄肉醬螺旋麵 ＋ 迷迭香烤時蔬（櫛瓜杏鮑菇彩椒）＋ 香濃南瓜濃湯", type: "自煮義式", cost: 480, tip: "茄紅素抗氧化，螺旋麵孩子容易入口，南瓜高纖助腸胃蠕動。" },
+    { name: "嘉義火雞肉飯便當4份 ＋ 鮮筍香菇土雞湯2盅 ＋ 皮蛋豆腐 ＋ 燙地瓜葉", type: "台式傳統小吃", cost: 560, tip: "火雞肉絲低脂高蛋白，傳統燉雞湯滋補元氣，小菜補充鈣質與纖維。" },
+    { name: "日式拉麵（豚骨叉燒拉麵2碗＋醬油拉麵1碗＋叉燒丼飯1碗＋日式現煎餃子2份）", type: "日式休閒", cost: 600, tip: "週五小週末首選，熱湯濃郁麵條彈牙，大人小孩舒壓解饞。" },
+    { name: "韓式海鮮蔬菜煎餅 ＋ 不辣豆腐豬肉大醬湯 ＋ 熱騰騰白米飯", type: "韓風家常", cost: 490, tip: "煎餅巧妙隱藏多種蔬菜，豆腐大醬湯發酵豆香益生菌多，溫和暖胃。" },
+    { name: "港式燒臘拼盤便當（脆皮燒肉＋油雞腿＋叉燒）＋ 廣東皮蛋瘦肉粥 ＋ 炒時蔬", type: "港式風味", cost: 570, tip: "有乾有濕，粥品好消化適合週間夜間腸胃放鬆，燒肉蛋白質滿分。" }
+  ],
+  weekend_lunch: [
+    { name: "美式手作牛肉起司堡＋煙燻鮭魚班尼迪克蛋＋兒童炸魚薯條＋鮮果沙拉＋果汁咖啡", type: "美式早午餐", cost: 1850, tip: "假日悠閒晚起首選，手作牛肉排肉汁豐沛，新鮮水果補充維生素。" },
+    { name: "拿坡里窯烤披薩與義式料理（瑪格麗特披薩＋松露野菇燉飯＋青醬蛤蜊麵＋凱薩沙拉）", type: "義式景觀餐廳", cost: 1920, tip: "柴燒窯烤麥香濃郁，蛤蜊高鋅助發育，氣氛歡樂適合全家共享。" },
+    { name: "勝博殿/杏子豬排（經典腰內豬排定食＋炸蝦腰內雙拼＋兒童咖哩豬排套餐＋高麗菜絲無限）", type: "日式精緻定食", cost: 1880, tip: "腰內肉軟嫩無筋小孩超好咬，清甜高麗菜絲大人多吃好消化去油膩。" },
+    { name: "港式茶餐廳點心饗宴（晶瑩鮮蝦餃＋蜜汁叉燒包＋鮮蝦腐皮卷＋廣東炒麵＋蠔油芥藍＋熱香片）", type: "港式飲茶", cost: 1860, tip: "點心多樣精緻，蝦仁高蛋白低脂，蒸點多於炸物少油健康。" },
+    { name: "泰式溫和合菜（月亮蝦餅＋黃咖哩滑蛋軟殼蟹/雞肉＋清蒸檸檬魚＋蝦醬高麗菜＋香米飯）", type: "泰式南洋", cost: 1950, tip: "月亮蝦餅厚實彈牙，滑蛋黃咖哩拌飯小朋友食慾大開，清蒸檸檬魚鮮嫩少刺。" },
+    { name: "精緻個人鍋物（雪花牛＋松阪豬＋豪華海鮮總匯盤＋滿滿五彩蔬菜盤＋餐後冰淇淋）", type: "精緻鍋物", cost: 1980, tip: "原型蔬菜多汁甘甜，海陸雙拼補足鐵、鋅與鈣質，大人小孩各取所需。" }
+  ],
+  weekend_dinner: [
+    { name: "壽司郎/藏壽司歡樂宴（鮭魚握壽司＋炙燒起司蝦＋玉子燒＋茶碗蒸＋炸烏龍麵＋轉扭蛋挑戰）", type: "知名迴轉壽司", cost: 1900, tip: "小孩吃壽司玩扭蛋超開心！深海鮭魚EPA/DHA豐富，食材新鮮衛生。" },
+    { name: "中式海鮮合菜小館（鳳梨蝦球＋金沙豆腐＋櫻花蝦炒高麗菜＋清蒸金目鱸魚＋蛤蜊冬瓜湯＋白飯）", type: "經典台菜小館", cost: 1850, tip: "金沙豆腐與鳳梨蝦球大人小孩通殺，整尾清蒸鱸魚補充優質魚肉蛋白。" },
+    { name: "韓式燒烤與韓風料理（厚切豬五花＋蜜汁無骨牛小排＋起司海鮮煎餅＋不辣牛骨雪濃湯＋小菜續加）", type: "韓式烤肉", cost: 1980, tip: "生菜包肉大人吃得清爽解膩，牛骨雪濃湯高鈣醇厚溫暖，儀式感十足。" },
+    { name: "溫補砂鍋土雞湯家庭宴（蒜頭蛤蜊土雞湯鍋＋茶油麵線＋清炒水蓮＋菜脯厚蛋＋白斬油雞腿）", type: "滋補台菜", cost: 1780, tip: "週日晚上收心補氣，蒜頭蛤蜊雞湯提升免疫力防感冒，麵線好消化助睡眠。" },
+    { name: "和風料理與特選鰻魚飯（鰻魚飯雙人份＋日式炒烏龍麵＋鹽烤鯖魚＋鹽烤雞肉串＋味噌湯）", type: "日式居酒屋/定食", cost: 1950, tip: "鰻魚富含維生素A、D、E，炒烏龍麵Q彈順口，烤物少油香氣逼人。" },
+    { name: "原塊牛排排餐與鮮採沙拉吧（香煎頂級板腱牛排2份＋挪威厚切鮭魚排＋濃湯＋沙拉吧無限量）", type: "美義排餐", cost: 1990, tip: "板腱牛排油花少鐵質高適合爸媽，鮭魚排鮮嫩多汁，沙拉吧蔬菜吃到飽。" }
+  ]
+};
+
+const SCHEDULE = [
+  { day: "週一", period: "晚餐", type: "weekday", budget: 600, pool: "weekday_dinner" },
+  { day: "週二", period: "晚餐", type: "weekday", budget: 600, pool: "weekday_dinner" },
+  { day: "週三", period: "晚餐", type: "weekday", budget: 600, pool: "weekday_dinner" },
+  { day: "週四", period: "晚餐", type: "weekday", budget: 600, pool: "weekday_dinner" },
+  { day: "週五", period: "晚餐", type: "weekday", budget: 600, pool: "weekday_dinner" },
+  { day: "週六", period: "午餐", type: "weekend", budget: 2000, pool: "weekend_lunch" },
+  { day: "週六", period: "晚餐", type: "weekend", budget: 2000, pool: "weekend_dinner" },
+  { day: "週日", period: "午餐", type: "weekend", budget: 2000, pool: "weekend_lunch" },
+  { day: "週日", period: "晚餐", type: "weekend", budget: 2000, pool: "weekend_dinner" },
+];
+
+let currentPlan = [];
+
+function getRandomSample(arr, n) {
+  const shuffled = [...arr].sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, n);
+}
+
+function generateAllMenu() {
+  currentPlan = SCHEDULE.map((slot, index) => {
+    const pool = MEAL_DATABASE[slot.pool];
+    const options = getRandomSample(pool, 3);
+    return { ...slot, options, id: index };
+  });
+  renderMenu();
+  document.getElementById("generateTime").textContent = "產生時間：" + new Date().toLocaleTimeString();
+  showToast("🎲 已為您重新抽出整週菜單！");
+}
+
+function rerollSlot(index) {
+  const slot = currentPlan[index];
+  const pool = MEAL_DATABASE[slot.pool];
+  slot.options = getRandomSample(pool, 3);
+  renderMenu();
+  showToast(`已重新挑選 ${slot.day} ${slot.period}！`);
+}
+
+function renderMenu() {
+  const container = document.getElementById("mealsContainer");
+  container.innerHTML = "";
+
+  currentPlan.forEach((item, idx) => {
+    const card = document.createElement("div");
+    card.className = `meal-card ${item.type}`;
+
+    const isWeekday = item.type === "weekday";
+    const badgeClass = isWeekday ? "badge-weekday" : "badge-weekend";
+    const badgeText = isWeekday ? "平日晚餐 ($150/人)" : "假日 ($500/人)";
+
+    let optionsHtml = item.options.map((opt, oIdx) => `
+      <div class="option-item ${oIdx === 0 ? 'highlight' : ''}">
+        ${oIdx === 0 ? '<span class="option-badge">⭐ 主推首選</span>' : `<span style="font-size:11px;color:#64748b;font-weight:600;">備選建議 ${oIdx + 1}</span>`}
+        <div class="option-name">${opt.name}</div>
+        <div class="option-details">
+          <span>🏷️ ${opt.type}</span>
+          <span>💵 預估約 $${opt.cost} 元</span>
+        </div>
+        <div class="option-tip">💡 ${opt.tip}</div>
+      </div>
+    `).join("");
+
+    card.innerHTML = `
+      <div class="meal-header">
+        <div class="meal-title">
+          <span>${item.day} ${item.period}</span>
+          <span class="badge ${badgeClass}">${badgeText}</span>
+        </div>
+        <div class="budget-tag">預算上限：$${item.budget.toLocaleString()}</div>
+      </div>
+      <div class="option-list">
+        ${optionsHtml}
+      </div>
+      <div class="card-footer">
+        <button class="btn-reroll" onclick="rerollSlot(${idx})">🎲 單餐重抽</button>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+function buildMarkdownText() {
+  let md = `# 🍽️ 四口之家 每週專屬菜單建議表\n\n`;
+  md += `> 📅 產生日期：${new Date().toLocaleDateString()}  |  👨‍👩‍👧‍👦 家庭成員：大人 2位 (42歲、41歲) ＋ 小孩 2位 (10歲、9歲)\n`;
+  md += `> 💰 預算規範：平日晚餐每人 $150 (全家 $600) ｜ 假日午晚餐每人 $500 (全家 $2,000)\n\n---\n\n`;
+
+  currentPlan.forEach(slot => {
+    md += `### 🥢 ${slot.day} ${slot.period}（預算：$${slot.budget} 元）\n\n`;
+    slot.options.forEach((opt, idx) => {
+      const mark = idx === 0 ? " ⭐【主推首選】" : "";
+      md += `**建議 ${idx + 1}：${opt.name}**${mark}\n`;
+      md += `- 🏷️ 類型：${opt.type} ｜ 💵 預估花費：約 $${opt.cost} 元\n`;
+      md += `- 💡 搭配特點：${opt.tip}\n\n`;
+    });
+    md += `---\n\n`;
+  });
+
+  md += `## 👨‍👩‍👧‍👦 爸媽快速飲食小叮嚀\n`;
+  md += `1. **9歲與10歲孩子發育期**：多吃鮭魚、鮮乳、豆腐、起司與高鈣深綠色蔬菜。\n`;
+  md += `2. **41與42歲父母護心抗老**：晚餐少精緻澱粉，多吃高纖蔬菜，少油少鹽。\n`;
+  return md;
+}
+
+async function saveDirectly() {
+  const content = buildMarkdownText();
+  const dateStr = new Date().toISOString().slice(0,10);
+  const fileName = `每週菜單_${dateStr}.md`;
+
+  if (window.showSaveFilePicker) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: fileName,
+        types: [{
+          description: 'Markdown 菜單檔案 (*.md)',
+          accept: { 'text/markdown': ['.md'] },
+        }],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(content);
+      await writable.close();
+      showToast("✅ 菜單已成功儲存至「晚餐資料夾」！");
+      return;
+    } catch (err) {
+      if (err.name === 'AbortError') return;
+    }
+  }
+
+  // 瀏覽器若不支援原生另存，則直接下載
+  const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = fileName;
+  a.click();
+  showToast("✅ 檔案已下載，請移入「晚餐資料夾」！");
+}
+
+function copyToClipboard() {
+  const text = buildMarkdownText();
+  navigator.clipboard.writeText(text).then(() => {
+    showToast("📋 已複製整週菜單文字！可直接貼上至 LINE 或記事本。");
+  });
+}
+
+function showToast(msg) {
+  const box = document.getElementById("toastBox");
+  box.textContent = msg;
+  box.style.display = "block";
+  setTimeout(() => { box.style.display = "none"; }, 3000);
+}
+
+window.onload = generateAllMenu;
+</script>
+</body>
+</html>
